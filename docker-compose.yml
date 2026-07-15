@@ -5,7 +5,7 @@ services:
     build: ./pandoc-sidecar
     container_name: pandoc-sidecar-work
     volumes:
-      - ${DOCS_DIR:-./docs}:/srv:ro
+      - ${DOCS_DIR:-.}:/srv:ro
     restart: unless-stopped
 
   caddy:
@@ -15,7 +15,7 @@ services:
       - "8095:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ${DOCS_DIR:-./docs}:/srv:ro
+      - ${DOCS_DIR:-.}:/srv:ro
     depends_on:
       - pandoc-sidecar
     restart: unless-stopped

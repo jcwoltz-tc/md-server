@@ -198,6 +198,13 @@ class PandocHandler(BaseHTTPRequestHandler):
 
         content = resolve_wiki_links(content, file_path, real_srv)
 
+        # Manual page breaks: a line containing just \newpage or <!-- pagebreak -->
+        content = re.sub(
+            r'(?im)^[ \t]*(?:\\newpage|<!--\s*pagebreak\s*-->)[ \t]*$',
+            '\n<div class="page-break"></div>\n',
+            content,
+        )
+
         # Doc-meta footer
         mtime = os.path.getmtime(file_path)
         modified = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
