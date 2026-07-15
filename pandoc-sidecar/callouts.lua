@@ -20,39 +20,50 @@
 -- warning, caution.  Each type keeps its own icon + label.
 
 -- type name (lowercase) -> { label, icon, cls }
+-- cls selects the CSS color class (.callout-<cls>); aliases share a cls.
 local types = {
-  -- blue (note)
+  -- blue
   note      = { label = "Note",      icon = "\u{2139}\u{FE0F}", cls = "note" },
-  info      = { label = "Info",      icon = "\u{2139}\u{FE0F}", cls = "note" },
-  todo      = { label = "Todo",      icon = "\u{1F532}",         cls = "note" },
-  abstract  = { label = "Abstract",  icon = "\u{1F4CB}",         cls = "note" },
-  summary   = { label = "Summary",   icon = "\u{1F4CB}",         cls = "note" },
-  tldr      = { label = "TL;DR",     icon = "\u{1F4CB}",         cls = "note" },
-  quote     = { label = "Quote",     icon = "\u{1F4AC}",         cls = "note" },
-  cite      = { label = "Quote",     icon = "\u{1F4AC}",         cls = "note" },
+  -- cyan
+  info      = { label = "Info",      icon = "\u{2139}\u{FE0F}", cls = "info" },
+  -- indigo
+  todo      = { label = "Todo",      icon = "\u{1F532}",         cls = "todo" },
+  -- teal
+  abstract  = { label = "Abstract",  icon = "\u{1F4CB}",         cls = "abstract" },
+  summary   = { label = "Summary",   icon = "\u{1F4CB}",         cls = "abstract" },
+  tldr      = { label = "TL;DR",     icon = "\u{1F4CB}",         cls = "abstract" },
+  -- gray
+  quote     = { label = "Quote",     icon = "\u{1F4AC}",         cls = "quote" },
+  cite      = { label = "Quote",     icon = "\u{1F4AC}",         cls = "quote" },
   -- green (tip)
   tip       = { label = "Tip",       icon = "\u{1F4A1}",         cls = "tip" },
   hint      = { label = "Hint",      icon = "\u{1F4A1}",         cls = "tip" },
-  success   = { label = "Success",   icon = "\u{2705}",          cls = "tip" },
-  check     = { label = "Check",     icon = "\u{2705}",          cls = "tip" },
-  done      = { label = "Done",      icon = "\u{2705}",          cls = "tip" },
+  -- emerald (success)
+  success   = { label = "Success",   icon = "\u{2705}",          cls = "success" },
+  check     = { label = "Check",     icon = "\u{2705}",          cls = "success" },
+  done      = { label = "Done",      icon = "\u{2705}",          cls = "success" },
   -- purple (important)
   important = { label = "Important", icon = "\u{1F4CC}",         cls = "important" },
-  example   = { label = "Example",   icon = "\u{1F4C4}",         cls = "important" },
+  -- violet (example)
+  example   = { label = "Example",   icon = "\u{1F4C4}",         cls = "example" },
   -- orange (warning)
   warning   = { label = "Warning",   icon = "\u{26A0}\u{FE0F}",  cls = "warning" },
   attention = { label = "Attention", icon = "\u{26A0}\u{FE0F}",  cls = "warning" },
-  question  = { label = "Question",  icon = "\u{2753}",          cls = "warning" },
-  help      = { label = "Help",      icon = "\u{2753}",          cls = "warning" },
-  faq       = { label = "FAQ",       icon = "\u{2753}",          cls = "warning" },
+  -- amber (question)
+  question  = { label = "Question",  icon = "\u{2753}",          cls = "question" },
+  help      = { label = "Help",      icon = "\u{2753}",          cls = "question" },
+  faq       = { label = "FAQ",       icon = "\u{2753}",          cls = "question" },
   -- red (caution)
   caution   = { label = "Caution",   icon = "\u{1F534}",         cls = "caution" },
-  failure   = { label = "Failure",   icon = "\u{274C}",          cls = "caution" },
-  fail      = { label = "Fail",      icon = "\u{274C}",          cls = "caution" },
-  missing   = { label = "Missing",   icon = "\u{274C}",          cls = "caution" },
-  danger    = { label = "Danger",    icon = "\u{1F534}",         cls = "caution" },
-  error     = { label = "Error",     icon = "\u{1F534}",         cls = "caution" },
-  bug       = { label = "Bug",       icon = "\u{1F41B}",         cls = "caution" },
+  -- orange-red (failure)
+  failure   = { label = "Failure",   icon = "\u{274C}",          cls = "failure" },
+  fail      = { label = "Fail",      icon = "\u{274C}",          cls = "failure" },
+  missing   = { label = "Missing",   icon = "\u{274C}",          cls = "failure" },
+  -- deep red (danger)
+  danger    = { label = "Danger",    icon = "\u{1F534}",         cls = "danger" },
+  error     = { label = "Error",     icon = "\u{1F534}",         cls = "danger" },
+  -- pink (bug)
+  bug       = { label = "Bug",       icon = "\u{1F41B}",         cls = "bug" },
 }
 
 local function build_callout(info, label, body_blocks)
