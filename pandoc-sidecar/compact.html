@@ -97,6 +97,25 @@
 
   .page-break { page-break-after: always; break-after: page; height: 0; }
 
+  /* Mermaid diagrams (rendered client-side into SVG) */
+  pre.mermaid { background: none; border-left: none; text-align: center; }
+
+  /* DRAFT watermark */
+  .draft-watermark {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 7em;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    color: rgba(192, 48, 48, 0.12);
+    pointer-events: none;
+    user-select: none;
+    z-index: 1000;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
   /* Print */
   @media print {
     @page { margin: 0.6in 0.75in; }
@@ -121,5 +140,74 @@
     tbody tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .callout { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     nav#TOC { border: none; background: none; padding: 0; }
+  }
+
+  /* Dark mode (screen only — print stays light) */
+  @media screen and (prefers-color-scheme: dark) {
+    body { background: #0d1117; color: #c9d1d9; }
+    h1 { color: #79b8e8; border-bottom-color: #2f5a80; }
+    h2 { color: #79b8e8; border-bottom-color: #30363d; }
+    h3 { color: #c9d1d9; }
+    blockquote { background: #161b22; border-left-color: #2f5a80; }
+    hr { border-top-color: #30363d; }
+    code { background: #161b22; }
+    pre { background: #161b22; border-left-color: #2f5a80; }
+    a { color: #58a6ff; }
+    .wiki-link-missing { color: #555; }
+    kbd { color: #c9d1d9; background: #21262d; border-color: #444; border-bottom-color: #666; }
+    thead tr { background-color: #1f3a55; }
+    th { border-color: #263850; }
+    td { border-color: #30363d; }
+    tbody tr:nth-child(even) td { background-color: #161b22; }
+    tbody tr:nth-child(odd)  td { background-color: #0d1117; }
+    tbody tr:hover td { background-color: #1c2733; }
+    nav#TOC { background: #161b22; border-color: #30363d; }
+    nav#TOC p { color: #8b949e; }
+    .doc-meta { color: #666; border-top-color: #30363d; }
+    .draft-watermark { color: rgba(248, 81, 73, 0.14); }
+    pre.mermaid { background: none; border-left: none; }
+
+    .callout-note      { background: #0c2436; }
+    .callout-note      .callout-title { color: #58a6ff; }
+    .callout-info      { background: #082a31; }
+    .callout-info      .callout-title { color: #22d3ee; }
+    .callout-todo      { background: #1a1a3d; }
+    .callout-todo      .callout-title { color: #818cf8; }
+    .callout-abstract  { background: #082723; }
+    .callout-abstract  .callout-title { color: #2dd4bf; }
+    .callout-quote     { background: #1c2128; }
+    .callout-quote     .callout-title { color: #9ea7b3; }
+    .callout-tip       { background: #0e2a10; }
+    .callout-tip       .callout-title { color: #56d364; }
+    .callout-success   { background: #0a2916; }
+    .callout-success   .callout-title { color: #3fb950; }
+    .callout-important { background: #271036; }
+    .callout-important .callout-title { color: #c084fc; }
+    .callout-example   { background: #1e1236; }
+    .callout-example   .callout-title { color: #a78bfa; }
+    .callout-warning   { background: #2e2000; }
+    .callout-warning   .callout-title { color: #e3b341; }
+    .callout-question  { background: #2b2102; }
+    .callout-question  .callout-title { color: #d4a72c; }
+    .callout-caution   { background: #2e0f0f; }
+    .callout-caution   .callout-title { color: #f47067; }
+    .callout-failure   { background: #2b1205; }
+    .callout-failure   .callout-title { color: #fb8f44; }
+    .callout-danger    { background: #2d0b0b; }
+    .callout-danger    .callout-title { color: #f85149; }
+    .callout-bug       { background: #2b0a1a; }
+    .callout-bug       .callout-title { color: #f778ba; }
+
+    /* Syntax highlighting: override pandoc's light kate theme */
+    div.sourceCode { background: #161b22; }
+    code span { color: #c9d1d9; }
+    code span.kw, code span.cf, code span.im { color: #c678dd; }
+    code span.dt, code span.pp { color: #e5c07b; }
+    code span.dv, code span.bn, code span.fl, code span.cn, code span.at { color: #d19a66; }
+    code span.st, code span.ch, code span.sc, code span.ss, code span.vs { color: #98c379; }
+    code span.co, code span.do, code span.an, code span.cv, code span.in { color: #8b949e; font-style: italic; }
+    code span.fu { color: #61afef; }
+    code span.va, code span.al, code span.er { color: #e06c75; }
+    code span.op, code span.ot { color: #56b6c2; }
   }
 </style>

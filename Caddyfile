@@ -6,8 +6,14 @@
     root * /srv
     file_server browse
 
-    @markdown path_regexp \.md(\.(break|toc|compact))*$
+    # Directory URLs render their index.md / README.md when one exists
+    try_files {path}/index.md {path}/README.md {path}
+
+    @markdown path_regexp \.md(\.(break|toc|compact|full))*$
     reverse_proxy @markdown pandoc-sidecar:3000
+
+    @assets path /_assets/mermaid.min.js
+    reverse_proxy @assets pandoc-sidecar:3000
 
     log {
         output stdout
