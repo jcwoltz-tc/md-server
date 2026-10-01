@@ -4,7 +4,10 @@
 
 :80 {
     root * /srv
-    file_server browse
+    # Hidden files/folders (.obsidian, .git, .env*) are neither listed nor served
+    file_server browse {
+        hide .*
+    }
 
     # Directory URLs render their index.md / README.md when one exists
     try_files {path}/index.md {path}/README.md {path}
@@ -21,6 +24,6 @@
     }
 
     handle_errors {
-        respond "Something went wrong" 500
+        respond "{err.status_code} {err.status_text}" {err.status_code}
     }
 }
