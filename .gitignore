@@ -1,3 +1,5 @@
 .env
+.env.*
+*.private.yml
 docs/
 !docs/example.md
