@@ -69,7 +69,11 @@ graph LR
 
 ### Wiki Links
 
-Obsidian-style `[[wiki links]]` are resolved against the served directory. Supports `[[file]]`, `[[file|display text]]`, and `[[file#heading]]`.
+Obsidian-style `[[wiki links]]` are resolved against the served directory. Supports `[[file]]`, `[[file|display text]]`, and `[[file#heading]]`. Embeds (`![[image.png|300]]`, video, audio, PDF) are supported too. Links in frontmatter and inside code are left alone.
+
+### Highlights
+
+Obsidian `==highlighted text==` renders as a highlight (light, dark and print).
 
 ### Other
 
