@@ -39,9 +39,12 @@ Append suffixes to any `.md` URL to change the output:
 | `.full` | Roomier layout, larger fonts |
 | `.break` | Page break before each H2 (for printing) |
 | `.toc` | Adds a table of contents |
+| `.meta` | Includes the tags/related strip when printing |
 | `.compact` | Accepted for old links (same as default) |
 
 Suffixes combine: `doc.md.toc.break` gives you a TOC with page breaks.
+
+You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & related" checkbox, **Print / PDF**, and **Open in Obsidian**. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
 
 All modes follow your OS/browser dark-mode preference on screen; printed output always stays light.
 
@@ -69,11 +72,22 @@ graph LR
 
 ### Wiki Links
 
-Obsidian-style `[[wiki links]]` are resolved against the served directory. Supports `[[file]]`, `[[file|display text]]`, and `[[file#heading]]`. Embeds (`![[image.png|300]]`, video, audio, PDF) are supported too. Links in frontmatter and inside code are left alone.
+Obsidian-style `[[wiki links]]` are resolved against the served directory. Supports `[[file]]`, `[[file|display text]]`, and `[[file#heading]]`. Embeds (`![[image.png|300]]`, video, audio, PDF) are supported too. Links inside code are left alone.
+
+### Tags and Related Notes
+
+Frontmatter `tags:` and `related:` show as a strip under the title: tags as chips, related entries as links (`[[wiki links]]` resolve like any other). The strip is on screen only; to print it, tick "Print tags & related" or add `.meta` to the URL.
+
+```yaml
+tags:
+  - ukg/rollout
+related:
+  - "[[UKG Rollout Questions]]"
+```
 
 ### Highlights
 
-Obsidian `==highlighted text==` renders as a highlight (light, dark and print).
+Obsidian `==highlighted text==` renders as a highlight (light, dark and print). A leading colored circle picks the color and is hidden, as in Obsidian's reading view: `==🔴text==`, plus 🟠 🟡 🟢 🔵 🟣.
 
 ### Other
 
