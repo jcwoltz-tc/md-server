@@ -32,12 +32,12 @@ _index_files = []     # current index file last; previous kept for in-flight ren
 
 
 def _get_index():
-    """Return (index file path, stamp)."""
+    """Return (index file path, stamp, vault-relative file list)."""
     global _index, _index_stamp, _index_built
     with _index_lock:
         now = time.monotonic()
         if _index is not None and now - _index_built < INDEX_TTL:
-            return _index_files[-1], _index_stamp
+            return _index_files[-1], _index_stamp, _index
         srv = os.path.realpath(SERVE_DIR)
         new = []
         for root, dirs, files in os.walk(srv):
@@ -59,7 +59,133 @@ def _get_index():
                     os.unlink(_index_files.pop(0))
                 except OSError:
                     pass
-        return _index_files[-1], _index_stamp
+        return _index_files[-1], _index_stamp, _index
+
+
+# ---------------------------------------------------------------------------
+# Backlinks: which notes link to a given note. Every .md file's link targets
+# are cached by mtime, so only changed files are re-read; targets resolve the
+# way obsidian.lua resolves them, so a backlink matches where the link goes.
+
+WIKILINK_RE = re.compile(r'\[\[([^\]|#^]*)[^\]]*\]\]')
+MDLINK_RE = re.compile(r'\]\(\s*<?([^)\s>]+?\.md)(?:#[^)\s>]*)?>?(?:\s+"[^"]*")?\s*\)', re.IGNORECASE)
+CODE_RE = re.compile(r'^(```|~~~).*?^\1[ \t]*$|`[^`\n]+`', re.MULTILINE | re.DOTALL)
+
+_links_lock = threading.Lock()
+_links = {}            # relpath -> (mtime, [('wiki', name) | ('md', path)])
+_backrefs = {}         # target relpath -> [source relpath, newest first]
+_backrefs_key = None   # (index stamp, links version) the map was built for
+_links_version = 0
+_links_checked = 0.0
+
+
+def _scan_links(text):
+    text = CODE_RE.sub('', text)
+    out = [('wiki', m.group(1).strip().rstrip('\\').strip()) for m in WIKILINK_RE.finditer(text)]
+    out += [('md', urllib.parse.unquote(m.group(1))) for m in MDLINK_RE.finditer(text)
+            if '://' not in m.group(1)]
+    return out
+
+
+def _norm(dirname, rel):
+    """Join and normalise a vault-relative path; None if it leaves the vault."""
+    parts = []
+    for seg in (dirname + '/' + rel if dirname else rel).split('/'):
+        if seg == '..':
+            if not parts:
+                return None
+            parts.pop()
+        elif seg and seg != '.':
+            parts.append(seg)
+    return '/'.join(parts)
+
+
+def _make_finder(files):
+    """Python twin of find() in obsidian.lua."""
+    exists = set(files)
+    by_name = {}
+    for p in files:   # already shortest first
+        by_name.setdefault(os.path.basename(p).lower(), []).append(p)
+
+    def find(src_dir, name):
+        name = name.replace('\\', '/')
+        same = _norm(src_dir, name)
+        if same and same in exists:
+            return same
+        candidates = by_name.get(os.path.basename(name).lower(), [])
+        if '/' in name:
+            suffix = '/' + name.lstrip('/').lower()
+            return next((p for p in candidates if ('/' + p.lower()).endswith(suffix)), None)
+        base = os.path.basename(name)
+        return next((p for p in candidates if os.path.basename(p) == base),
+                    candidates[0] if candidates else None)
+    return find, exists
+
+
+def _get_backlinks(target_rel, files, stamp):
+    """Notes linking to target_rel, newest first."""
+    global _backrefs, _backrefs_key, _links_version, _links_checked
+    srv = os.path.realpath(SERVE_DIR)
+    with _links_lock:
+        now = time.monotonic()
+        if now - _links_checked >= INDEX_TTL:
+            _links_checked = now
+            md = [p for p in files if p.lower().endswith('.md')]
+            changed = False
+            for rel in md:
+                try:
+                    mtime = os.path.getmtime(os.path.join(srv, rel))
+                except OSError:
+                    continue
+                cached = _links.get(rel)
+                if cached and cached[0] == mtime:
+                    continue
+                try:
+                    with open(os.path.join(srv, rel), 'r', encoding='utf-8-sig', errors='replace') as f:
+                        _links[rel] = (mtime, _scan_links(f.read()))
+                except OSError:
+                    continue
+                changed = True
+            live = set(md)
+            for rel in [r for r in _links if r not in live]:
+                del _links[rel]
+                changed = True
+            if changed:
+                _links_version += 1
+
+        if _backrefs_key != (stamp, _links_version):
+            find, exists = _make_finder(files)
+            refs = {}
+            for src, (_, targets) in _links.items():
+                src_dir = os.path.dirname(src)
+                for kind, name in targets:
+                    if kind == 'wiki':
+                        if not name:
+                            continue
+                        hit = find(src_dir, name + '.md')
+                        if not hit and '.' in name:
+                            hit = find(src_dir, name)
+                    else:
+                        hit = _norm('', name.lstrip('/')) if name.startswith('/') else _norm(src_dir, name)
+                        hit = hit if hit in exists else None
+                    if hit and hit != src:
+                        refs.setdefault(hit, set()).add(src)
+            _backrefs = {t: sorted(s, key=lambda r: (-_links[r][0], r)) for t, s in refs.items()}
+            _backrefs_key = (stamp, _links_version)
+        return _backrefs.get(target_rel, [])
+
+
+def _backlinks_html(sources):
+    items = []
+    for rel in sources:
+        url = urllib.parse.quote('/' + rel)
+        name = os.path.splitext(os.path.basename(rel))[0]
+        folder = os.path.dirname(rel)
+        items.append(f'<li><a href="{url}">{html.escape(name)}</a>'
+                     + (f' <span class="backlink-dir">{html.escape(folder)}</span>' if folder else '')
+                     + '</li>')
+    return (f'<div class="backlinks"><details open><summary>Linked from ({len(sources)})</summary>'
+            f'<ul>{"".join(items)}</ul></details></div>')
 
 
 def _parse_frontmatter(content):
@@ -69,7 +195,7 @@ def _parse_frontmatter(content):
 
 
 # ---------------------------------------------------------------------------
-# Render cache: (path, style, toc, meta) -> (mtime, index_stamp, html bytes)
+# Render cache: (path, style, toc, meta, backlinks) -> (mtime, index_stamp, html bytes)
 
 _cache_lock = threading.Lock()
 _render_cache = {}
@@ -157,8 +283,9 @@ class PandocHandler(BaseHTTPRequestHandler):
         style_file = os.path.join(STYLES_DIR, style_name)
 
         mtime = os.path.getmtime(file_path)
-        index_file, index_stamp = _get_index()
-        cache_key = (file_path, style_name, toc_mode, meta_mode)
+        index_file, index_stamp, index_list = _get_index()
+        backlinks = _get_backlinks(os.path.relpath(file_path, real_srv), index_list, index_stamp)
+        cache_key = (file_path, style_name, toc_mode, meta_mode, tuple(backlinks))
         cached = _cache_get(cache_key, mtime, index_stamp)
         if cached is not None:
             self.send_html(cached)
@@ -238,6 +365,13 @@ class PandocHandler(BaseHTTPRequestHandler):
 
             if toc_mode:
                 cmd += ['--toc', '--toc-depth=3', '--metadata=toc-title:Contents']
+
+            if backlinks:
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+                    f.write(_backlinks_html(backlinks))
+                    backlinks_tmp = f.name
+                tmp_files.append(backlinks_tmp)
+                cmd.append(f'--include-after-body={backlinks_tmp}')
 
             cmd += [
                 f'--include-after-body={footer_tmp}',

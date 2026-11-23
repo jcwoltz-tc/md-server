@@ -13,9 +13,17 @@
   /* Inline #tags in the body: same chip, sized to sit in running text */
   .inline-tag { font-size: 0.88em; padding: 0 0.45em; line-height: 1.45; }
 
+  /* Backlinks (built by server.py) */
+  .backlinks { margin-top: 1.5em; padding-top: 0.6em; border-top: 1px solid #e3e7ec; font-size: 0.88em; }
+  .backlinks summary { cursor: pointer; font-weight: 600; color: #1a3a5c; }
+  .backlinks ul { margin: 0.3em 0 0; }
+  .backlink-dir { color: #888; font-size: 0.9em; margin-left: 0.3em; }
+
   /* Hidden in print unless asked for (toolbar checkbox or .meta suffix) */
   @media print {
-    html:not(.print-props) .doc-props { display: none; }
+    html:not(.print-props) .doc-props,
+    html:not(.print-props) .backlinks { display: none; }
+    .backlinks summary { list-style: none; }
     .doc-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 
@@ -23,5 +31,8 @@
     .doc-props-label { color: #8b949e; }
     .doc-tag { background: #1f2d3d; color: #9cc8f0; }
     .doc-related:not(:last-child)::after { color: #555; }
+    .backlinks { border-top-color: #30363d; }
+    .backlinks summary { color: #79b8e8; }
+    .backlink-dir { color: #6e7681; }
   }
 </style>

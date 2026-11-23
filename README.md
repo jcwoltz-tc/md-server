@@ -39,12 +39,12 @@ Append suffixes to any `.md` URL to change the output:
 | `.full` | Roomier layout, larger fonts |
 | `.break` | Page break before each H2 (for printing) |
 | `.toc` | Adds a table of contents |
-| `.meta` | Includes the tags/related strip when printing |
+| `.meta` | Includes the tags/related strip and backlinks when printing |
 | `.compact` | Accepted for old links (same as default) |
 
 Suffixes combine: `doc.md.toc.break` gives you a TOC with page breaks.
 
-You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & related" checkbox, **Print / PDF**, and **Open in Obsidian**. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
+You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & links" checkbox, **Print / PDF**, and **Open in Obsidian**. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
 
 All modes follow your OS/browser dark-mode preference on screen; printed output always stays light.
 
@@ -76,7 +76,9 @@ Obsidian-style `[[wiki links]]` are resolved against the served directory. Suppo
 
 ### Tags and Related Notes
 
-Frontmatter `tags:` and `related:` show as a strip under the title: tags as chips, related entries as links (`[[wiki links]]` resolve like any other). The strip is on screen only; to print it, tick "Print tags & related" or add `.meta` to the URL.
+Frontmatter `tags:` and `related:` show as a strip under the title: tags as chips, related entries as links (`[[wiki links]]` resolve like any other). The strip is on screen only; to print it, tick "Print tags & links" or add `.meta` to the URL.
+
+Each note also lists its backlinks at the bottom ("Linked from"), newest first: every note whose `[[wiki link]]`, embed, frontmatter link or relative `.md` link resolves to it. Links inside code are ignored. They follow the same print toggle.
 
 Inline `#tags` in the body get the same chip style, following Obsidian's rules (`#123` and `foo#bar` aren't tags; tags in link text and code are left alone).
 

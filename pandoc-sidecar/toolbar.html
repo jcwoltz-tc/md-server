@@ -39,7 +39,7 @@
     <a class="tb-seg" data-style=".break">Page breaks</a>
   </span>
   <label><input type="checkbox" id="tb-toc"> Contents</label>
-  <label id="tb-props-wrap" hidden><input type="checkbox" id="tb-props"> Print tags &amp; related</label>
+  <label id="tb-props-wrap" hidden><input type="checkbox" id="tb-props"> Print tags &amp; links</label>
   <span class="tb-spacer"></span>
   <a class="tb-btn" id="tb-obsidian" hidden>Open in Obsidian</a>
   <button type="button" class="tb-btn tb-primary" id="tb-print">Print / PDF</button>
@@ -80,8 +80,8 @@ document.addEventListener('DOMContentLoaded', function () {
   toc.checked = state.toc;
   toc.addEventListener('change', function () { location.href = url(withState('toc', toc.checked)); });
 
-  // Print tags & related: no reload, just the class and the URL
-  if (document.querySelector('.doc-props')) {
+  // Print tags, related and backlinks: no reload, just the class and the URL
+  if (document.querySelector('.doc-props, .backlinks')) {
     var props = document.getElementById('tb-props');
     document.getElementById('tb-props-wrap').hidden = false;
     props.checked = document.documentElement.classList.contains('print-props');
