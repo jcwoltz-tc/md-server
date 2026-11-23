@@ -6,6 +6,7 @@
 --   ==🟢highlight== (🔴🟠🟡🟢🔵🟣)              <mark class="hl-green">
 --   \newpage  /  <!-- pagebreak -->            manual page break
 --   frontmatter tags: / related:               strip under the H1
+--   #tag in the body                           <span class="doc-tag inline-tag">
 --
 -- Runs on the AST, so code blocks and inline code are never touched.
 -- Needs the reader extension +wikilinks_title_after_pipe, which turns
@@ -399,9 +400,54 @@ local function doc_props(doc)
   return doc
 end
 
+-- ---------------------------------------------------------------------------
+-- Inline #tags, styled like the chips in the tags strip. Obsidian's rules: a
+-- word starting with "#", made of letters, digits, _ - /, with at least one
+-- non-digit ("#123" is not a tag). Link text and the strip itself are skipped.
+
+local function tag_split(text)
+  if text:sub(1, 1) ~= '#' then return nil end
+  local i = 2
+  while i <= #text do
+    local c = text:byte(i)
+    -- ASCII tag characters, or any byte of a multi-byte (non-ASCII) letter
+    if not (c >= 128 or text:sub(i, i):match('[%w_/%-]')) then break end
+    i = i + 1
+  end
+  local tag = text:sub(2, i - 1)
+  if tag == '' or not tag:match('[^%d]') then return nil end
+  return tag, text:sub(i)
+end
+
+local function inline_tags(inlines)
+  local out, any = pandoc.Inlines({}), false
+  for _, el in ipairs(inlines) do
+    local tag, rest
+    if el.t == 'Str' then tag, rest = tag_split(el.text) end
+    if tag then
+      -- Two Strs, so the span's own text doesn't match again on the way down
+      out:insert(pandoc.Span({ pandoc.Str('#'), pandoc.Str(tag) },
+        pandoc.Attr('', { 'doc-tag', 'inline-tag' })))
+      if rest ~= '' then out:insert(pandoc.Str(rest)) end
+      any = true
+    else
+      out:insert(el)
+    end
+  end
+  return any and out or nil
+end
+
+local function skip_children(el) return el, false end
+
 return {
   { Pandoc = drop_duplicate_title },
   { Pandoc = doc_props },
   { Inlines = wikilinks },
   { Inlines = highlight, Para = para_break, Plain = para_break, RawBlock = raw_break },
+  {
+    traverse = 'topdown',
+    Link = skip_children,
+    Div = function(el) if el.classes:includes('doc-props') then return el, false end end,
+    Inlines = inline_tags,
+  },
 }

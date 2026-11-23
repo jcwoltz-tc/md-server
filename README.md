@@ -78,6 +78,8 @@ Obsidian-style `[[wiki links]]` are resolved against the served directory. Suppo
 
 Frontmatter `tags:` and `related:` show as a strip under the title: tags as chips, related entries as links (`[[wiki links]]` resolve like any other). The strip is on screen only; to print it, tick "Print tags & related" or add `.meta` to the URL.
 
+Inline `#tags` in the body get the same chip style, following Obsidian's rules (`#123` and `foo#bar` aren't tags; tags in link text and code are left alone).
+
 ```yaml
 tags:
   - ukg/rollout

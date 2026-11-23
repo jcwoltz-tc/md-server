@@ -10,6 +10,8 @@
     background: #e8eef5; color: #1a3a5c;
   }
   .doc-related:not(:last-child)::after { content: " ·"; color: #999; }
+  /* Inline #tags in the body: same chip, sized to sit in running text */
+  .inline-tag { font-size: 0.88em; padding: 0 0.45em; line-height: 1.45; }
 
   /* Hidden in print unless asked for (toolbar checkbox or .meta suffix) */
   @media print {
