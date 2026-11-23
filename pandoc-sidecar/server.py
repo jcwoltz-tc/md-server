@@ -16,6 +16,7 @@ PANDOC_TIMEOUT = 60   # seconds before a pandoc run is killed
 INDEX_TTL = 5.0       # seconds before the filename index is rebuilt
 CACHE_MAX = 128       # rendered pages kept in memory
 GENERATED = b'@@MD-SERVER-GENERATED@@'   # footer timestamp, filled per request
+OBSIDIAN_VAULT = os.environ.get('OBSIDIAN_VAULT', '')   # enables "Open in Obsidian"
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +197,17 @@ class PandocHandler(BaseHTTPRequestHandler):
                 footer_tmp = f.name
             tmp_files.append(footer_tmp)
 
+            # Page facts for the toolbar: the file rendered (a directory URL
+            # may be serving its index.md) and the Obsidian vault name
+            rel_url = '/' + os.path.relpath(file_path, real_srv)
+            toolbar_meta = f'<meta name="md-path" content="{html.escape(rel_url)}">\n'
+            if OBSIDIAN_VAULT:
+                toolbar_meta += f'<meta name="md-vault" content="{html.escape(OBSIDIAN_VAULT)}">\n'
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+                f.write(toolbar_meta)
+                toolbar_meta_tmp = f.name
+            tmp_files.append(toolbar_meta_tmp)
+
             cmd = [
                 'pandoc', file_path,
                 '-f', 'gfm+hard_line_breaks+yaml_metadata_block+wikilinks_title_after_pipe',
@@ -208,6 +220,8 @@ class PandocHandler(BaseHTTPRequestHandler):
                 f'--resource-path={os.path.dirname(file_path)}',
                 f'--include-in-header={style_file}',
                 '--include-in-header=/app/props.html',
+                f'--include-in-header={toolbar_meta_tmp}',
+                '--include-before-body=/app/toolbar.html',
                 # pagetitle sets <title> only; title would add a second H1
                 f'--metadata=pagetitle:{doc_title}',
             ]
