@@ -5,6 +5,7 @@
 --   ==highlight==                              <mark>
 --   ==🟢highlight== (🔴🟠🟡🟢🔵🟣)              <mark class="hl-green">
 --   \newpage  /  <!-- pagebreak -->            manual page break
+--   frontmatter tags: / related:               strip under the H1
 --
 -- Runs on the AST, so code blocks and inline code are never touched.
 -- Needs the reader extension +wikilinks_title_after_pipe, which turns
@@ -342,8 +343,65 @@ local function drop_duplicate_title(doc)
   end
 end
 
+-- ---------------------------------------------------------------------------
+-- Frontmatter `tags:` and `related:` as a strip under the H1 (or at the top
+-- when there is none). Runs before the wikilink pass, so [[links]] in
+-- `related:` are resolved like any other. Hidden in print unless the page
+-- has <html class="print-props"> (toolbar checkbox or the .meta suffix).
+
+local function meta_items(value)
+  if value == nil then return {} end
+  if pandoc.utils.type(value) == 'List' then return value end
+  return { value }
+end
+
+local function as_inlines(item)
+  local t = pandoc.utils.type(item)
+  if t == 'Inlines' then return item end
+  if t == 'Blocks' then return pandoc.utils.blocks_to_inlines(item) end
+  return pandoc.Inlines({ pandoc.Str(pandoc.utils.stringify(item)) })
+end
+
+local function props_row(label, cls, items)
+  local row = pandoc.Inlines({
+    pandoc.Span({ pandoc.Str(label) }, pandoc.Attr('', { 'doc-props-label' })),
+  })
+  for _, item in ipairs(items) do
+    row:insert(pandoc.Space())
+    row:insert(pandoc.Span(item, pandoc.Attr('', { cls })))
+  end
+  return pandoc.Div({ pandoc.Plain(row) }, pandoc.Attr('', { 'doc-props-row' }))
+end
+
+local function doc_props(doc)
+  local tags = {}
+  for _, item in ipairs(meta_items(doc.meta.tags)) do
+    -- "tags: a, b" and "tags: a b" are single strings in YAML
+    for tag in pandoc.utils.stringify(item):gmatch('[^,%s]+') do
+      tags[#tags + 1] = pandoc.Inlines({ pandoc.Str('#' .. tag:gsub('^#', '')) })
+    end
+  end
+  local related = {}
+  for _, item in ipairs(meta_items(doc.meta.related)) do
+    local inl = as_inlines(item)
+    if #inl > 0 then related[#related + 1] = inl end
+  end
+  if #tags == 0 and #related == 0 then return nil end
+
+  local rows = {}
+  if #tags > 0 then rows[#rows + 1] = props_row('Tags', 'doc-tag', tags) end
+  if #related > 0 then rows[#rows + 1] = props_row('Related', 'doc-related', related) end
+  local div = pandoc.Div(rows, pandoc.Attr('', { 'doc-props' }))
+
+  local first = doc.blocks[1]
+  local at = (first and first.t == 'Header' and first.level == 1) and 2 or 1
+  doc.blocks:insert(at, div)
+  return doc
+end
+
 return {
   { Pandoc = drop_duplicate_title },
+  { Pandoc = doc_props },
   { Inlines = wikilinks },
   { Inlines = highlight, Para = para_break, Plain = para_break, RawBlock = raw_break },
 }

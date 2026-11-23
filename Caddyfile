@@ -12,7 +12,7 @@
     # Directory URLs render their index.md / README.md when one exists
     try_files {path}/index.md {path}/README.md {path}
 
-    @markdown path_regexp \.md(\.(break|toc|compact|full))*$
+    @markdown path_regexp \.md(\.(break|toc|compact|full|meta))*$
     reverse_proxy @markdown pandoc-sidecar:3000
 
     @assets path /_assets/mermaid.min.js

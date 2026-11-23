@@ -1,0 +1,25 @@
+<style>
+  /* Frontmatter tags / related strip (built by obsidian.lua) */
+  .doc-props { font-size: 0.85em; margin: -0.2em 0 1em; line-height: 1.9; }
+  .doc-props-label {
+    display: inline-block; min-width: 4.5em; font-weight: 600; color: #666;
+    text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85em;
+  }
+  .doc-tag {
+    display: inline-block; padding: 0 0.55em; border-radius: 1em; line-height: 1.6;
+    background: #e8eef5; color: #1a3a5c;
+  }
+  .doc-related:not(:last-child)::after { content: " ·"; color: #999; }
+
+  /* Hidden in print unless asked for (toolbar checkbox or .meta suffix) */
+  @media print {
+    html:not(.print-props) .doc-props { display: none; }
+    .doc-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @media screen and (prefers-color-scheme: dark) {
+    .doc-props-label { color: #8b949e; }
+    .doc-tag { background: #1f2d3d; color: #9cc8f0; }
+    .doc-related:not(:last-child)::after { color: #555; }
+  }
+</style>

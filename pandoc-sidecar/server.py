@@ -68,7 +68,7 @@ def _parse_frontmatter(content):
 
 
 # ---------------------------------------------------------------------------
-# Render cache: (path, style, toc) -> (mtime, index_stamp, html bytes)
+# Render cache: (path, style, toc, meta) -> (mtime, index_stamp, html bytes)
 
 _cache_lock = threading.Lock()
 _render_cache = {}
@@ -102,6 +102,7 @@ class PandocHandler(BaseHTTPRequestHandler):
         break_mode = False
         toc_mode = False
         full_mode = False
+        meta_mode = False   # print the tags/related strip
         changed = True
         while changed:
             changed = False
@@ -119,6 +120,10 @@ class PandocHandler(BaseHTTPRequestHandler):
             elif path.endswith('.full'):
                 path = path[:-5]
                 full_mode = True
+                changed = True
+            elif path.endswith('.meta'):
+                path = path[:-5]
+                meta_mode = True
                 changed = True
 
         if not path.endswith('.md'):
@@ -152,7 +157,7 @@ class PandocHandler(BaseHTTPRequestHandler):
 
         mtime = os.path.getmtime(file_path)
         index_file, index_stamp = _get_index()
-        cache_key = (file_path, style_name, toc_mode)
+        cache_key = (file_path, style_name, toc_mode, meta_mode)
         cached = _cache_get(cache_key, mtime, index_stamp)
         if cached is not None:
             self.send_html(cached)
@@ -202,6 +207,7 @@ class PandocHandler(BaseHTTPRequestHandler):
                 '--lua-filter=/app/mermaid.lua',
                 f'--resource-path={os.path.dirname(file_path)}',
                 f'--include-in-header={style_file}',
+                '--include-in-header=/app/props.html',
                 # pagetitle sets <title> only; title would add a second H1
                 f'--metadata=pagetitle:{doc_title}',
             ]
@@ -212,6 +218,9 @@ class PandocHandler(BaseHTTPRequestHandler):
                     draft_tmp = f.name
                 tmp_files.append(draft_tmp)
                 cmd.append(f'--include-before-body={draft_tmp}')
+
+            if meta_mode:
+                cmd.append('--include-in-header=/app/printprops.html')
 
             if toc_mode:
                 cmd += ['--toc', '--toc-depth=3', '--metadata=toc-title:Contents']
