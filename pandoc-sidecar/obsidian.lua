@@ -3,6 +3,7 @@
 --   [[note]] [[note|label]] [[note#heading]]   resolved against the vault
 --   ![[image.png|300]] ![[clip.mp4]] ![[doc.pdf]]   embeds
 --   ==highlight==                              <mark>
+--   ==🟢highlight== (🔴🟠🟡🟢🔵🟣)              <mark class="hl-green">
 --   \newpage  /  <!-- pagebreak -->            manual page break
 --
 -- Runs on the AST, so code blocks and inline code are never touched.
@@ -247,6 +248,33 @@ local function split_markers(inlines)
   return toks, any
 end
 
+-- Colored highlights (Colorful Highlights plugin syntax): a leading
+-- colored-circle emoji picks the color and is hidden, as in Obsidian's
+-- reading view. "==🟢text==" -> <mark class="hl-green">text</mark>.
+local HL_COLOR = {
+  ['🔴'] = 'red', ['🟠'] = 'orange', ['🟡'] = 'yellow',
+  ['🟢'] = 'green', ['🔵'] = 'blue', ['🟣'] = 'purple',
+}
+
+local function mark_classes(inner)
+  local first = inner[1]
+  if first and first.t == 'Str' then
+    for emoji, color in pairs(HL_COLOR) do
+      if first.text:sub(1, #emoji) == emoji then
+        local rest = first.text:sub(#emoji + 1)
+        if rest == '' then
+          inner:remove(1)
+          if inner[1] and inner[1].t == 'Space' then inner:remove(1) end
+        else
+          inner[1] = pandoc.Str(rest)
+        end
+        return { 'mark', 'hl-' .. color }
+      end
+    end
+  end
+  return { 'mark' }
+end
+
 local function highlight(inlines)
   local toks, any = split_markers(inlines)
   if not any then return nil end
@@ -268,7 +296,7 @@ local function highlight(inlines)
       if close then
         local inner = pandoc.Inlines({})
         for k = i + 1, close - 1 do inner:insert(toks[k]) end
-        out:insert(pandoc.Span(inner, pandoc.Attr('', { 'mark' })))
+        out:insert(pandoc.Span(inner, pandoc.Attr('', mark_classes(inner))))
         i = close + 1
       else
         out:insert(pandoc.Str('=='))
