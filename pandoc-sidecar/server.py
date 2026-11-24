@@ -31,6 +31,13 @@ _index_built = 0.0
 _index_files = []     # current index file last; previous kept for in-flight renders
 
 
+def _hidden_or_outside(real_path, real_srv):
+    """True if a resolved path leaves the vault or passes through a dot entry."""
+    if not real_path.startswith(real_srv + os.sep):
+        return True
+    return any(part.startswith('.') for part in os.path.relpath(real_path, real_srv).split(os.sep))
+
+
 def _get_index():
     """Return (index file path, stamp, vault-relative file list)."""
     global _index, _index_stamp, _index_built
@@ -43,8 +50,14 @@ def _get_index():
         for root, dirs, files in os.walk(srv):
             dirs[:] = [d for d in dirs if not d.startswith('.')]
             for name in files:
-                if not name.startswith('.'):
-                    new.append(os.path.relpath(os.path.join(root, name), srv))
+                if name.startswith('.'):
+                    continue
+                full = os.path.join(root, name)
+                # A symlink is listed only when its target is a visible file
+                # inside the vault; do_GET applies the same rule
+                if os.path.islink(full) and _hidden_or_outside(os.path.realpath(full), srv):
+                    continue
+                new.append(os.path.relpath(full, srv))
         new.sort(key=lambda p: (len(p), p))  # prefer shortest (least-nested) path
         _index_built = now
         if new != _index:
@@ -67,9 +80,17 @@ def _get_index():
 # are cached by mtime, so only changed files are re-read; targets resolve the
 # way obsidian.lua resolves them, so a backlink matches where the link goes.
 
-WIKILINK_RE = re.compile(r'\[\[([^\]|#^]*)[^\]]*\]\]')
-MDLINK_RE = re.compile(r'\]\(\s*<?([^)\s>]+?\.md)(?:#[^)\s>]*)?>?(?:\s+"[^"]*")?\s*\)', re.IGNORECASE)
-CODE_RE = re.compile(r'^(```|~~~).*?^\1[ \t]*$|`[^`\n]+`', re.MULTILINE | re.DOTALL)
+# Scanned line by line with bounded patterns, so a malformed note (an
+# unclosed [[ or fence, a huge line) costs linear time, never quadratic.
+WIKILINK_RE = re.compile(r'\[\[([^\[\]|#\n]{0,500})(?:[|#][^\]\n]{0,500})?\]\]')
+MDLINK_RE = re.compile(
+    r'\]\(\s{0,10}(?:<([^<>\n]{1,500}?\.md)>|([^()\s<>]{1,500}?\.md))'
+    r'(?:#[^()\s]{0,500})?(?:\s{1,10}"[^"\n]{0,500}")?\s{0,10}\)', re.IGNORECASE)
+REFLINK_RE = re.compile(r'^\s{0,3}\[[^\]\n]{1,500}\]:\s{0,10}<?([^\s<>]{1,500}?\.md)(?:#\S*)?>?(?:\s|$)',
+                        re.IGNORECASE)
+FENCE_RE = re.compile(r'^\s*(`{3,}|~{3,})')
+INLINE_CODE_RE = re.compile(r'`[^`\n]*`')
+SCAN_MAX_BYTES = 4 * 1024 * 1024   # notes bigger than this are not scanned
 
 _links_lock = threading.Lock()
 _links = {}            # relpath -> (mtime, [('wiki', name) | ('md', path)])
@@ -80,10 +101,34 @@ _links_checked = 0.0
 
 
 def _scan_links(text):
-    text = CODE_RE.sub('', text)
-    out = [('wiki', m.group(1).strip().rstrip('\\').strip()) for m in WIKILINK_RE.finditer(text)]
-    out += [('md', urllib.parse.unquote(m.group(1))) for m in MDLINK_RE.finditer(text)
-            if '://' not in m.group(1)]
+    """Link targets in a note, skipping fenced and inline code.
+
+    Known gap: 4-space indented code blocks are scanned, because a line
+    indented that far is just as often a nested list item."""
+    out = []
+    fence = None
+    for line in text.split('\n'):
+        m = FENCE_RE.match(line)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                    and not line.strip()[len(m.group(1)):].strip():
+                fence = None
+            continue
+        if m:
+            fence = m.group(1)
+            continue
+        line = INLINE_CODE_RE.sub('', line)
+        if '[[' in line:
+            out += [('wiki', m.group(1).strip().rstrip('\\').strip()) for m in WIKILINK_RE.finditer(line)]
+        if '](' in line:
+            for m in MDLINK_RE.finditer(line):
+                target = m.group(1) or m.group(2)
+                if '://' not in target:
+                    out.append(('md', urllib.parse.unquote(target)))
+        if ']:' in line:
+            m = REFLINK_RE.match(line)
+            if m and '://' not in m.group(1):
+                out.append(('md', urllib.parse.unquote(m.group(1))))
     return out
 
 
@@ -128,31 +173,42 @@ def _get_backlinks(target_rel, files, stamp):
     srv = os.path.realpath(SERVE_DIR)
     with _links_lock:
         now = time.monotonic()
-        if now - _links_checked >= INDEX_TTL:
+        due = now - _links_checked >= INDEX_TTL
+        if due:
             _links_checked = now
-            md = [p for p in files if p.lower().endswith('.md')]
-            changed = False
-            for rel in md:
+
+    # Files are read and scanned without the lock, so a slow scan never
+    # blocks other requests; results are swapped in under it
+    if due:
+        md = [p for p in files if p.lower().endswith('.md')]
+        updates = {}
+        for rel in md:
+            full = os.path.join(srv, rel)
+            try:
+                st = os.stat(full)
+            except OSError:
+                continue
+            cached = _links.get(rel)
+            if cached and cached[0] == st.st_mtime:
+                continue
+            targets = []
+            if st.st_size <= SCAN_MAX_BYTES:
                 try:
-                    mtime = os.path.getmtime(os.path.join(srv, rel))
+                    with open(full, 'r', encoding='utf-8-sig', errors='replace') as f:
+                        targets = _scan_links(f.read())
                 except OSError:
                     continue
-                cached = _links.get(rel)
-                if cached and cached[0] == mtime:
-                    continue
-                try:
-                    with open(os.path.join(srv, rel), 'r', encoding='utf-8-sig', errors='replace') as f:
-                        _links[rel] = (mtime, _scan_links(f.read()))
-                except OSError:
-                    continue
-                changed = True
-            live = set(md)
-            for rel in [r for r in _links if r not in live]:
+            updates[rel] = (st.st_mtime, targets)
+        live = set(md)
+        with _links_lock:
+            gone = [r for r in _links if r not in live]
+            for rel in gone:
                 del _links[rel]
-                changed = True
-            if changed:
+            _links.update(updates)
+            if updates or gone:
                 _links_version += 1
 
+    with _links_lock:
         if _backrefs_key != (stamp, _links_version):
             find, exists = _make_finder(files)
             refs = {}
@@ -268,6 +324,10 @@ class PandocHandler(BaseHTTPRequestHandler):
         file_path = os.path.realpath(os.path.join(real_srv, path.lstrip('/')))
         if not file_path.startswith(real_srv + os.sep):
             self.send_error(403, 'Forbidden')
+            return
+        # A symlink must not reach a hidden file (.obsidian, .git, ...)
+        if _hidden_or_outside(file_path, real_srv):
+            self.send_error(404, 'File not found')
             return
 
         if not os.path.isfile(file_path):
