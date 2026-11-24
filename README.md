@@ -46,6 +46,8 @@ Suffixes combine: `doc.md.toc.break` gives you a TOC with page breaks.
 
 You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & links" checkbox, **Print / PDF**, and **Open in Obsidian**. Hover over any of them for a short explanation. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
 
+Above the controls, breadcrumbs show the note's folder path (Home › folder › note); each folder opens its file listing. **Recent** opens `/_recent`, the notes changed today, in the last 7 days or in the last 30 days, newest first and grouped by day.
+
 All modes follow your OS/browser dark-mode preference on screen; printed output always stays light.
 
 ### Callouts

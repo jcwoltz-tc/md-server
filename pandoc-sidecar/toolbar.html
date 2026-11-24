@@ -8,6 +8,11 @@
     background: #fff; border-bottom: 1px solid #e3e7ec;
   }
   .md-toolbar .tb-group { display: inline-flex; align-items: center; gap: 0.3em; }
+  .md-toolbar .tb-crumbs { flex-basis: 100%; color: #888; overflow-wrap: anywhere; }
+  .md-toolbar .tb-crumbs a { color: #1a5c8e; text-decoration: none; }
+  .md-toolbar .tb-crumbs a:hover { text-decoration: underline; }
+  .md-toolbar .tb-crumbs .tb-sep { margin: 0 0.35em; color: #aaa; }
+  .md-toolbar .tb-crumbs .tb-here { color: #333; }
   .md-toolbar .tb-label { color: #888; margin-right: 0.15em; }
   .md-toolbar a.tb-seg {
     padding: 0.1em 0.55em; border: 1px solid #d0d7de; border-radius: 3px;
@@ -26,6 +31,8 @@
   @media screen and (prefers-color-scheme: dark) {
     .md-toolbar { background: #0d1117; border-bottom-color: #30363d; color: #8b949e; }
     .md-toolbar .tb-label { color: #6e7681; }
+    .md-toolbar .tb-crumbs a { color: #58a6ff; }
+    .md-toolbar .tb-crumbs .tb-here { color: #c9d1d9; }
     .md-toolbar a.tb-seg { border-color: #30363d; color: #58a6ff; }
     .md-toolbar a.tb-seg[aria-current="true"] { background: #1f3a55; border-color: #2f5a80; color: #fff; }
     .md-toolbar a.tb-btn, .md-toolbar button.tb-btn { background: #0d1117; border-color: #2f5a80; color: #79b8e8; }
@@ -33,6 +40,7 @@
   }
 </style>
 <div class="md-toolbar" role="toolbar" aria-label="Page options">
+  <nav class="tb-crumbs" id="tb-crumbs" aria-label="Folder path" hidden></nav>
   <span class="tb-group"><span class="tb-label" title="How the page is laid out, on screen and in print. This bar is never printed.">Layout</span>
     <a class="tb-seg" data-style="" title="Compact (default): smaller type and tighter spacing, so more fits on a page">Compact</a>
     <a class="tb-seg" data-style=".full" title="Full: roomier spacing and larger type, easier to read on screen">Full</a>
@@ -41,6 +49,7 @@
   <label title="Show a table of contents at the top (H1-H3). Reloads the page."><input type="checkbox" id="tb-toc"> Contents</label>
   <label id="tb-props-wrap" hidden title="Include the tags, related notes and 'Linked from' list when printing or saving a PDF. They always show on screen. Leave off for PDFs going outside IT: these links only work on this server."><input type="checkbox" id="tb-props"> Print tags &amp; links</label>
   <span class="tb-spacer"></span>
+  <a class="tb-btn" href="/_recent" title="Notes changed recently across the whole vault, newest first">Recent</a>
   <a class="tb-btn" id="tb-obsidian" hidden title="Open this note in the Obsidian app on this computer">Open in Obsidian</a>
   <button type="button" class="tb-btn tb-primary" id="tb-print" title="Print, or pick 'Save as PDF' as the printer to get a PDF">Print / PDF</button>
 </div>
@@ -61,6 +70,36 @@ document.addEventListener('DOMContentLoaded', function () {
     meta: /\.meta/.test(sfx)
   };
   var base = file.split('/').map(encodeURIComponent).join('/');
+
+  // Breadcrumbs: Home > folder > folder > note; folders open Caddy's listing
+  var crumbs = document.getElementById('tb-crumbs');
+  var parts = file.replace(/^\//, '').split('/');
+  function crumbLink(text, href, title) {
+    var a = document.createElement('a');
+    a.textContent = text;
+    a.href = href;
+    a.title = title;
+    return a;
+  }
+  function sep() {
+    var s = document.createElement('span');
+    s.className = 'tb-sep';
+    s.textContent = '\u203A';
+    return s;
+  }
+  crumbs.appendChild(crumbLink('Home', '/', 'Top of the vault'));
+  var href = '/';
+  parts.slice(0, -1).forEach(function (dir) {
+    href += encodeURIComponent(dir) + '/';
+    crumbs.appendChild(sep());
+    crumbs.appendChild(crumbLink(dir, href, 'Open the ' + dir + ' folder'));
+  });
+  var here = document.createElement('span');
+  here.className = 'tb-here';
+  here.textContent = parts[parts.length - 1].replace(/\.md$/i, '');
+  crumbs.appendChild(sep());
+  crumbs.appendChild(here);
+  crumbs.hidden = false;
   function url(s) {
     return base + s.style + (s.toc ? '.toc' : '') + (s.meta ? '.meta' : '') + location.hash;
   }

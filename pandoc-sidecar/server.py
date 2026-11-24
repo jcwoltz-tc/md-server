@@ -244,6 +244,103 @@ def _backlinks_html(sources):
             f'<ul>{"".join(items)}</ul></details></div>')
 
 
+# ---------------------------------------------------------------------------
+# Recently changed notes (/_recent?days=N): the file index sorted by mtime,
+# grouped by day. Stats ~1000 files per request (a few ms).
+
+RECENT_DAYS = (1, 7, 30)
+RECENT_MAX = 300
+
+
+def _recent_html(days):
+    srv = os.path.realpath(SERVE_DIR)
+    _, _, files = _get_index()
+    if days == 1:   # "Today" means since midnight, not the last 24 hours
+        cutoff = datetime.combine(datetime.now().date(), datetime.min.time()).timestamp()
+    else:
+        cutoff = time.time() - days * 86400
+    notes = []
+    for rel in files:
+        if not rel.lower().endswith('.md'):
+            continue
+        try:
+            mtime = os.path.getmtime(os.path.join(srv, rel))
+        except OSError:
+            continue
+        if mtime >= cutoff:
+            notes.append((mtime, rel))
+    notes.sort(reverse=True)
+    total = len(notes)
+    notes = notes[:RECENT_MAX]
+
+    today = datetime.now().date()
+    body, current_day = [], None
+    for mtime, rel in notes:
+        when = datetime.fromtimestamp(mtime)
+        day = when.date()
+        if day != current_day:
+            if current_day is not None:
+                body.append('</ul>')
+            gap = (today - day).days
+            label = 'Today' if gap == 0 else 'Yesterday' if gap == 1 else when.strftime('%a %b %-d')
+            body.append(f'<h3>{label}</h3><ul class="recent">')
+            current_day = day
+        folder = os.path.dirname(rel)
+        body.append(
+            f'<li><span class="recent-time">{when.strftime("%H:%M")}</span> '
+            f'<a href="{urllib.parse.quote("/" + rel)}">{html.escape(os.path.splitext(os.path.basename(rel))[0])}</a>'
+            + (f' <span class="backlink-dir">{html.escape(folder)}</span>' if folder else '')
+            + '</li>')
+    if current_day is not None:
+        body.append('</ul>')
+    if not notes:
+        body.append('<p>No notes changed in this period.</p>')
+
+    choices = ' '.join(
+        f'<a class="tb-seg" href="/_recent?days={d}"'
+        + (' aria-current="true"' if d == days else '')
+        + (' title="Notes changed since midnight">' if d == 1 else f' title="Notes changed in the last {d} days">')
+        + ('Today' if d == 1 else f'{d} days') + '</a>'
+        for d in RECENT_DAYS)
+    count = f'{total} note{"" if total == 1 else "s"}' if total <= RECENT_MAX else f'Newest {RECENT_MAX} of {total} notes'
+    shown = count + (' changed today' if days == 1 else f' changed in the last {days} days')
+
+    with open(os.path.join(STYLES_DIR, 'compact.html'), encoding='utf-8') as f:
+        style = f.read()
+    with open(os.path.join(STYLES_DIR, 'props.html'), encoding='utf-8') as f:
+        style += f.read()
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recently changed</title>
+{style}
+<style>
+  .recent-bar {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em 1em;
+    font: 12px/1.4 Segoe UI, Calibri, Arial, sans-serif; color: #888;
+    padding: 0.45em 0; border-bottom: 1px solid #e3e7ec; margin-bottom: 1em; }}
+  .recent-bar a {{ color: #1a5c8e; text-decoration: none; }}
+  .recent-bar a.tb-seg {{ padding: 0.1em 0.55em; border: 1px solid #d0d7de; border-radius: 3px; }}
+  .recent-bar a.tb-seg[aria-current="true"] {{ background: #1a3a5c; border-color: #1a3a5c; color: #fff; }}
+  ul.recent {{ list-style: none; padding-left: 0; }}
+  .recent-time {{ display: inline-block; width: 3.2em; color: #888; font-variant-numeric: tabular-nums; }}
+  @media print {{ .recent-bar {{ display: none; }} }}
+  @media screen and (prefers-color-scheme: dark) {{
+    .recent-bar {{ border-bottom-color: #30363d; color: #6e7681; }}
+    .recent-bar a {{ color: #58a6ff; }}
+    .recent-bar a.tb-seg {{ border-color: #30363d; }}
+    .recent-bar a.tb-seg[aria-current="true"] {{ background: #1f3a55; border-color: #2f5a80; color: #fff; }}
+    .recent-time {{ color: #6e7681; }}
+  }}
+</style>
+</head><body>
+<div class="recent-bar"><a href="/" title="Top of the vault">Home</a> <span>{choices}</span></div>
+<h1>Recently changed</h1>
+<p class="backlink-dir">{shown}</p>
+{''.join(body)}
+</body></html>
+"""
+
+
 def _parse_frontmatter(content):
     """Return (raw YAML frontmatter, offset where the body starts), or ('', 0)."""
     m = re.match(r'---[ \t]*\n(.*?)\n(?:---|\.\.\.)[ \t]*(?:\n|\Z)', content, re.DOTALL)
@@ -279,6 +376,15 @@ class PandocHandler(BaseHTTPRequestHandler):
 
         if path == '/_assets/mermaid.min.js':
             self.serve_asset('mermaid.min.js', 'text/javascript; charset=utf-8')
+            return
+
+        if path == '/_recent':
+            try:
+                days = int(urllib.parse.parse_qs(parsed.query).get('days', ['7'])[0])
+            except ValueError:
+                days = 7
+            days = days if days in RECENT_DAYS else 7
+            self.send_html(_recent_html(days).encode('utf-8'))
             return
 
         # Strip known suffixes in any order
