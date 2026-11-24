@@ -44,7 +44,7 @@ Append suffixes to any `.md` URL to change the output:
 
 Suffixes combine: `doc.md.toc.break` gives you a TOC with page breaks.
 
-You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & links" checkbox, **Print / PDF**, and **Open in Obsidian**. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
+You don't need to remember them: every page has a bar at the top (screen only, never printed) with the layout choices, a Contents checkbox, a "Print tags & links" checkbox, **Print / PDF**, and **Open in Obsidian**. Hover over any of them for a short explanation. The Obsidian button appears when `OBSIDIAN_VAULT` is set to the vault's name in `.env`.
 
 All modes follow your OS/browser dark-mode preference on screen; printed output always stays light.
 
@@ -121,6 +121,8 @@ ports:
 ## Security
 
 This server has no authentication and serves over plain HTTP — intended for local or trusted-network use.
+
+Notes may contain raw HTML, as in Obsidian, so anyone who can write to the served folder can put script on its pages. Hidden files and folders (`.obsidian`, `.git`, `.env`) are never served or listed, and a symlink is served only when it points to a visible file inside the served folder.
 
 Since it already uses Caddy, you can add security directly in the Caddyfile:
 
