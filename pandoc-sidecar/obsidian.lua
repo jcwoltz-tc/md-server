@@ -258,23 +258,36 @@ local HL_COLOR = {
   ['🟢'] = 'green', ['🔵'] = 'blue', ['🟣'] = 'purple',
 }
 
-local function mark_classes(inner)
-  local first = inner[1]
-  if first and first.t == 'Str' then
-    for emoji, color in pairs(HL_COLOR) do
-      if first.text:sub(1, #emoji) == emoji then
-        local rest = first.text:sub(#emoji + 1)
-        if rest == '' then
-          inner:remove(1)
-          if inner[1] and inner[1].t == 'Space' then inner:remove(1) end
-        else
-          inner[1] = pandoc.Str(rest)
-        end
-        return { 'mark', 'hl-' .. color }
+-- Takes the color emoji off the front of `inlines` (descending into a
+-- leading **bold** / *italic*); returns the color, or nil.
+local function take_color(inlines)
+  local first = inlines[1]
+  if not first then return nil end
+  if first.t == 'Strong' or first.t == 'Emph' or first.t == 'Underline' then
+    return take_color(first.content)
+  end
+  if first.t ~= 'Str' then return nil end
+  for emoji, color in pairs(HL_COLOR) do
+    if first.text:sub(1, #emoji) == emoji then
+      local rest = first.text:sub(#emoji + 1)
+      if rest == '' then
+        inlines:remove(1)
+        if inlines[1] and inlines[1].t == 'Space' then inlines:remove(1) end
+      else
+        inlines[1] = pandoc.Str(rest)
       end
+      return color
     end
   end
-  return { 'mark' }
+end
+
+local function mark_classes(inner)
+  -- A lone emoji (==🟣==) has no text to color: keep it as written
+  if #inner == 1 and inner[1].t == 'Str' and HL_COLOR[inner[1].text] then
+    return { 'mark' }
+  end
+  local color = take_color(inner)
+  return color and { 'mark', 'hl-' .. color } or { 'mark' }
 end
 
 local function highlight(inlines)
@@ -358,6 +371,14 @@ end
 
 local function as_inlines(item)
   local t = pandoc.utils.type(item)
+  -- Unquoted `- [[Note]]` is YAML for a list inside a list: treat it as the
+  -- wikilink Obsidian sees (server.py's backlink scan counts it the same way)
+  if t == 'List' and #item == 1 and pandoc.utils.type(item[1]) == 'List' and #item[1] == 1 then
+    local text = pandoc.utils.stringify(item[1][1])
+    local target = text:match('^([^|]*)')
+    local label = text:match('|(.*)$') or target
+    return pandoc.Inlines({ pandoc.Link(label, target, '', pandoc.Attr('', { 'wikilink' })) })
+  end
   if t == 'Inlines' then return item end
   if t == 'Blocks' then return pandoc.utils.blocks_to_inlines(item) end
   return pandoc.Inlines({ pandoc.Str(pandoc.utils.stringify(item)) })
@@ -405,18 +426,35 @@ end
 -- word starting with "#", made of letters, digits, _ - /, with at least one
 -- non-digit ("#123" is not a tag). Link text and the strip itself are skipped.
 
+-- Non-ASCII code points that end a tag: Latin-1 punctuation and symbols
+-- (NBSP, «, ·, ...), General Punctuation (dashes, curly quotes, ellipsis),
+-- CJK punctuation and fullwidth ASCII punctuation.
+local function ends_tag(cp)
+  return (cp >= 0x80 and cp <= 0xBF) or cp == 0xD7 or cp == 0xF7
+    or (cp >= 0x2000 and cp <= 0x206F) or (cp >= 0x3000 and cp <= 0x303F)
+    or (cp >= 0xFF00 and cp <= 0xFF0F) or (cp >= 0xFF1A and cp <= 0xFF20)
+end
+
 local function tag_split(text)
   if text:sub(1, 1) ~= '#' then return nil end
-  local i = 2
-  while i <= #text do
-    local c = text:byte(i)
-    -- ASCII tag characters, or any byte of a multi-byte (non-ASCII) letter
-    if not (c >= 128 or text:sub(i, i):match('[%w_/%-]')) then break end
-    i = i + 1
-  end
-  local tag = text:sub(2, i - 1)
+  local stop = #text + 1
+  local ok = pcall(function()
+    for pos, cp in utf8.codes(text) do
+      if pos > 1 then
+        local tag_char
+        if cp < 128 then
+          tag_char = string.char(cp):match('[%w_/%-]') ~= nil
+        else
+          tag_char = not ends_tag(cp)
+        end
+        if not tag_char then stop = pos; return end
+      end
+    end
+  end)
+  if not ok then return nil end   -- invalid UTF-8: leave the text alone
+  local tag = text:sub(2, stop - 1)
   if tag == '' or not tag:match('[^%d]') then return nil end
-  return tag, text:sub(i)
+  return tag, text:sub(stop)
 end
 
 local function inline_tags(inlines)
@@ -444,10 +482,14 @@ return {
   { Pandoc = doc_props },
   { Inlines = wikilinks },
   { Inlines = highlight, Para = para_break, Plain = para_break, RawBlock = raw_break },
-  {
-    traverse = 'topdown',
-    Link = skip_children,
-    Div = function(el) if el.classes:includes('doc-props') then return el, false end end,
-    Inlines = inline_tags,
-  },
+  -- Body only: a frontmatter `title: "#x"` is not a tag
+  { Pandoc = function(doc)
+      doc.blocks = doc.blocks:walk({
+        traverse = 'topdown',
+        Link = skip_children,
+        Div = function(el) if el.classes:includes('doc-props') then return el, false end end,
+        Inlines = inline_tags,
+      })
+      return doc
+    end },
 }
