@@ -348,7 +348,7 @@ def _parse_frontmatter(content):
 
 
 # ---------------------------------------------------------------------------
-# Render cache: (path, style, toc, meta, backlinks) -> (mtime, index_stamp, html bytes)
+# Render cache: (path, toc, break, meta, backlinks) -> (mtime, index_stamp, html bytes)
 
 _cache_lock = threading.Lock()
 _render_cache = {}
@@ -388,10 +388,9 @@ class PandocHandler(BaseHTTPRequestHandler):
             return
 
         # Strip known suffixes in any order
-        break_mode = False
+        break_mode = False  # print each H2 on a new page
         toc_mode = False
-        full_mode = False
-        meta_mode = False   # print the tags/related strip
+        meta_mode = False   # print the tags/related strip and backlinks
         changed = True
         while changed:
             changed = False
@@ -404,11 +403,10 @@ class PandocHandler(BaseHTTPRequestHandler):
                 toc_mode = True
                 changed = True
             elif path.endswith('.compact'):
-                path = path[:-8]   # compact is the default; accepted for old links
+                path = path[:-8]   # old layout names, accepted for old links
                 changed = True
             elif path.endswith('.full'):
                 path = path[:-5]
-                full_mode = True
                 changed = True
             elif path.endswith('.meta'):
                 path = path[:-5]
@@ -440,18 +438,13 @@ class PandocHandler(BaseHTTPRequestHandler):
             self.send_error(404, 'File not found')
             return
 
-        if break_mode:
-            style_name = 'break.html'
-        elif full_mode:
-            style_name = 'nobreak.html'
-        else:
-            style_name = 'compact.html'
-        style_file = os.path.join(STYLES_DIR, style_name)
+        # One layout (compact). .full is an old layout name, accepted and ignored
+        style_file = os.path.join(STYLES_DIR, 'compact.html')
 
         mtime = os.path.getmtime(file_path)
         index_file, index_stamp, index_list = _get_index()
         backlinks = _get_backlinks(os.path.relpath(file_path, real_srv), index_list, index_stamp)
-        cache_key = (file_path, style_name, toc_mode, meta_mode, tuple(backlinks))
+        cache_key = (file_path, toc_mode, break_mode, meta_mode, tuple(backlinks))
         cached = _cache_get(cache_key, mtime, index_stamp)
         if cached is not None:
             self.send_html(cached)
@@ -528,6 +521,9 @@ class PandocHandler(BaseHTTPRequestHandler):
 
             if meta_mode:
                 cmd.append('--include-in-header=/app/printprops.html')
+
+            if break_mode:
+                cmd.append('--include-in-header=/app/printbreaks.html')
 
             if toc_mode:
                 cmd += ['--toc', '--toc-depth=3', '--metadata=toc-title:Contents']

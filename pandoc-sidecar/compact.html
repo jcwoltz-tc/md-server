@@ -147,6 +147,10 @@
     tbody tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .callout { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     nav#TOC { border: none; background: none; padding: 0; }
+
+    /* Page breaks option (toolbar checkbox or .break suffix): each H2 on a new page */
+    html.page-breaks h2 { page-break-before: always; break-before: page; }
+    html.page-breaks h2:first-of-type { page-break-before: avoid; break-before: avoid; }
   }
 
   /* Dark mode (screen only — print stays light) */

@@ -7,18 +7,11 @@
     font: 12px/1.4 Segoe UI, Calibri, Arial, sans-serif; color: #555;
     background: #fff; border-bottom: 1px solid #e3e7ec;
   }
-  .md-toolbar .tb-group { display: inline-flex; align-items: center; gap: 0.3em; }
   .md-toolbar .tb-crumbs { flex-basis: 100%; color: #888; overflow-wrap: anywhere; }
   .md-toolbar .tb-crumbs a { color: #1a5c8e; text-decoration: none; }
   .md-toolbar .tb-crumbs a:hover { text-decoration: underline; }
   .md-toolbar .tb-crumbs .tb-sep { margin: 0 0.35em; color: #aaa; }
   .md-toolbar .tb-crumbs .tb-here { color: #333; }
-  .md-toolbar .tb-label { color: #888; margin-right: 0.15em; }
-  .md-toolbar a.tb-seg {
-    padding: 0.1em 0.55em; border: 1px solid #d0d7de; border-radius: 3px;
-    color: #1a5c8e; text-decoration: none;
-  }
-  .md-toolbar a.tb-seg[aria-current="true"] { background: #1a3a5c; border-color: #1a3a5c; color: #fff; }
   .md-toolbar label { display: inline-flex; align-items: center; gap: 0.3em; cursor: pointer; }
   .md-toolbar .tb-spacer { flex: 1; }
   .md-toolbar a.tb-btn, .md-toolbar button.tb-btn {
@@ -30,23 +23,16 @@
   @media print { .md-toolbar { display: none !important; } }
   @media screen and (prefers-color-scheme: dark) {
     .md-toolbar { background: #0d1117; border-bottom-color: #30363d; color: #8b949e; }
-    .md-toolbar .tb-label { color: #6e7681; }
     .md-toolbar .tb-crumbs a { color: #58a6ff; }
     .md-toolbar .tb-crumbs .tb-here { color: #c9d1d9; }
-    .md-toolbar a.tb-seg { border-color: #30363d; color: #58a6ff; }
-    .md-toolbar a.tb-seg[aria-current="true"] { background: #1f3a55; border-color: #2f5a80; color: #fff; }
     .md-toolbar a.tb-btn, .md-toolbar button.tb-btn { background: #0d1117; border-color: #2f5a80; color: #79b8e8; }
     .md-toolbar button.tb-btn.tb-primary { background: #1f3a55; color: #fff; }
   }
 </style>
 <div class="md-toolbar" role="toolbar" aria-label="Page options">
   <nav class="tb-crumbs" id="tb-crumbs" aria-label="Folder path" hidden></nav>
-  <span class="tb-group"><span class="tb-label" title="How the page is laid out, on screen and in print. This bar is never printed.">Layout</span>
-    <a class="tb-seg" data-style="" title="Compact (default): smaller type and tighter spacing, so more fits on a page">Compact</a>
-    <a class="tb-seg" data-style=".full" title="Full: roomier spacing and larger type, easier to read on screen">Full</a>
-    <a class="tb-seg" data-style=".break" title="Page breaks: when printed, each H2 section starts on a new page">Page breaks</a>
-  </span>
   <label title="Show a table of contents at the top (H1-H3). Reloads the page."><input type="checkbox" id="tb-toc"> Contents</label>
+  <label title="When printing or saving a PDF, start each H2 section on a new page. No effect on screen."><input type="checkbox" id="tb-breaks"> Page breaks</label>
   <label id="tb-props-wrap" hidden title="Include the tags, related notes and 'Linked from' list when printing or saving a PDF. They always show on screen. Leave off for PDFs going outside IT: these links only work on this server."><input type="checkbox" id="tb-props"> Print tags &amp; links</label>
   <span class="tb-spacer"></span>
   <a class="tb-btn" href="/_recent" title="Notes changed recently across the whole vault, newest first">Recent</a>
@@ -64,9 +50,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var file = meta('md-path');
   if (!file) return;
   var sfx = (location.pathname.match(/(\.(break|toc|compact|full|meta))+$/) || [''])[0];
+  // .full and .compact are old layout names: accepted, dropped from new URLs
   var state = {
-    style: /\.break/.test(sfx) ? '.break' : /\.full/.test(sfx) ? '.full' : '',
     toc: /\.toc/.test(sfx),
+    breaks: /\.break/.test(sfx),
     meta: /\.meta/.test(sfx)
   };
   var base = file.split('/').map(encodeURIComponent).join('/');
@@ -101,39 +88,34 @@ document.addEventListener('DOMContentLoaded', function () {
   crumbs.appendChild(here);
   crumbs.hidden = false;
   function url(s) {
-    return base + s.style + (s.toc ? '.toc' : '') + (s.meta ? '.meta' : '') + location.hash;
+    return base + (s.toc ? '.toc' : '') + (s.breaks ? '.break' : '') + (s.meta ? '.meta' : '')
+      + location.hash;
   }
-  function withState(k, v) {
-    var s = { style: state.style, toc: state.toc, meta: state.meta };
-    s[k] = v;
-    return s;
+  // Any old suffix (.full, .compact) is normalised away
+  if (location.pathname !== url(state).replace(/#.*$/, '')) {
+    history.replaceState(null, '', url(state));
   }
-
-  // Layout links carry the other options; refreshed when one changes
-  var segs = document.querySelectorAll('.md-toolbar a.tb-seg');
-  function refreshSegs() {
-    segs.forEach(function (a) { a.href = url(withState('style', a.getAttribute('data-style'))); });
-  }
-  segs.forEach(function (a) {
-    if (a.getAttribute('data-style') === state.style) a.setAttribute('aria-current', 'true');
-  });
-  refreshSegs();
 
   var toc = document.getElementById('tb-toc');
   toc.checked = state.toc;
-  toc.addEventListener('change', function () { location.href = url(withState('toc', toc.checked)); });
+  toc.addEventListener('change', function () {
+    state.toc = toc.checked;
+    location.href = url(state);   // the contents are built by the server
+  });
 
-  // Print tags, related and backlinks: no reload, just the class and the URL
-  if (document.querySelector('.doc-props, .backlinks')) {
-    var props = document.getElementById('tb-props');
-    document.getElementById('tb-props-wrap').hidden = false;
-    props.checked = document.documentElement.classList.contains('print-props');
-    props.addEventListener('change', function () {
-      state.meta = props.checked;
-      document.documentElement.classList.toggle('print-props', props.checked);
+  // Print-only options: no reload, just a class on <html> and the URL
+  function printToggle(box, key, cls) {
+    box.checked = document.documentElement.classList.contains(cls);
+    box.addEventListener('change', function () {
+      state[key] = box.checked;
+      document.documentElement.classList.toggle(cls, box.checked);
       history.replaceState(null, '', url(state));
-      refreshSegs();
     });
+  }
+  printToggle(document.getElementById('tb-breaks'), 'breaks', 'page-breaks');
+  if (document.querySelector('.doc-props, .backlinks')) {
+    document.getElementById('tb-props-wrap').hidden = false;
+    printToggle(document.getElementById('tb-props'), 'meta', 'print-props');
   }
 
   // A collapsed "Linked from" would print as an empty box: open it for print
