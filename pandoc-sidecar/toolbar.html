@@ -33,16 +33,16 @@
   }
 </style>
 <div class="md-toolbar" role="toolbar" aria-label="Page options">
-  <span class="tb-group"><span class="tb-label">Layout</span>
-    <a class="tb-seg" data-style="">Compact</a>
-    <a class="tb-seg" data-style=".full">Full</a>
-    <a class="tb-seg" data-style=".break">Page breaks</a>
+  <span class="tb-group"><span class="tb-label" title="How the page is laid out, on screen and in print. This bar is never printed.">Layout</span>
+    <a class="tb-seg" data-style="" title="Compact (default): smaller type and tighter spacing, so more fits on a page">Compact</a>
+    <a class="tb-seg" data-style=".full" title="Full: roomier spacing and larger type, easier to read on screen">Full</a>
+    <a class="tb-seg" data-style=".break" title="Page breaks: when printed, each H2 section starts on a new page">Page breaks</a>
   </span>
-  <label><input type="checkbox" id="tb-toc"> Contents</label>
-  <label id="tb-props-wrap" hidden><input type="checkbox" id="tb-props"> Print tags &amp; links</label>
+  <label title="Show a table of contents at the top (H1-H3). Reloads the page."><input type="checkbox" id="tb-toc"> Contents</label>
+  <label id="tb-props-wrap" hidden title="Include the tags, related notes and 'Linked from' list when printing or saving a PDF. They always show on screen. Leave off for PDFs going outside IT: these links only work on this server."><input type="checkbox" id="tb-props"> Print tags &amp; links</label>
   <span class="tb-spacer"></span>
-  <a class="tb-btn" id="tb-obsidian" hidden>Open in Obsidian</a>
-  <button type="button" class="tb-btn tb-primary" id="tb-print">Print / PDF</button>
+  <a class="tb-btn" id="tb-obsidian" hidden title="Open this note in the Obsidian app on this computer">Open in Obsidian</a>
+  <button type="button" class="tb-btn tb-primary" id="tb-print" title="Print, or pick 'Save as PDF' as the printer to get a PDF">Print / PDF</button>
 </div>
 <script>
 // Runs at the top of <body>, so wait for the rest of the page
@@ -70,11 +70,15 @@ document.addEventListener('DOMContentLoaded', function () {
     return s;
   }
 
-  document.querySelectorAll('.md-toolbar a.tb-seg').forEach(function (a) {
-    var style = a.getAttribute('data-style');
-    a.href = url(withState('style', style));
-    if (style === state.style) a.setAttribute('aria-current', 'true');
+  // Layout links carry the other options; refreshed when one changes
+  var segs = document.querySelectorAll('.md-toolbar a.tb-seg');
+  function refreshSegs() {
+    segs.forEach(function (a) { a.href = url(withState('style', a.getAttribute('data-style'))); });
+  }
+  segs.forEach(function (a) {
+    if (a.getAttribute('data-style') === state.style) a.setAttribute('aria-current', 'true');
   });
+  refreshSegs();
 
   var toc = document.getElementById('tb-toc');
   toc.checked = state.toc;
@@ -89,8 +93,14 @@ document.addEventListener('DOMContentLoaded', function () {
       state.meta = props.checked;
       document.documentElement.classList.toggle('print-props', props.checked);
       history.replaceState(null, '', url(state));
+      refreshSegs();
     });
   }
+
+  // A collapsed "Linked from" would print as an empty box: open it for print
+  window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('.backlinks details').forEach(function (d) { d.open = true; });
+  });
 
   var vault = meta('md-vault');
   if (vault) {
